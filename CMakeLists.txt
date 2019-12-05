@@ -35,6 +35,8 @@ endif ()
 
 include_directories(tensor4/include)
 include_directories(tensor4/examples/common)
+#include_directories(/opt/intel/mkl/include)
+#link_directories(/opt/intel/mkl/lib/intel64)
 
 # Main sources
 ##############################################################
@@ -46,7 +48,7 @@ add_executable(stylegan ${SOURCES})
 ##############################################################
 if(MSVC)
 else()
-    set(LIBRARIES rt m gomp)
+    set(LIBRARIES rt m gomp)# mkl_rt)
 endif()
 
 target_link_libraries(stylegan ${LIBRARIES})

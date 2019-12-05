@@ -19,20 +19,10 @@ sys.path.append('stylegan/dnnlib')
 sys.path.append('tensor4/tensor4')
 
 import struct
-import os
-import sys
-import argparse
-import logging
-import torch
 import dnnlib
 import dnnlib.tflib
-import dnnlib.tflib as tflib
 import pickle
 import numpy as np
-from torchvision.utils import save_image
-import PIL
-from dnnlib import EasyDict
-import var_table
 
 
 def write_blob(model, filename=None):
