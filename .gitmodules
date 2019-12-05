@@ -1,0 +1,6 @@
+[submodule "tensor4"]
+	path = tensor4
+	url = https://github.com/podgorskiy/tensor4.git
+[submodule "stylegan"]
+	path = stylegan
+	url = https://github.com/NVlabs/stylegan.git
