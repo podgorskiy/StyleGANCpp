@@ -4,3 +4,6 @@
 [submodule "stylegan"]
 	path = stylegan
 	url = https://github.com/NVlabs/stylegan.git
+[submodule "zfp"]
+	path = zfp
+	url = https://github.com/LLNL/zfp.git

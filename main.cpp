@@ -7,22 +7,11 @@
 
 t4::tensor2f MappingForward(const StyleGAN& model, t4::tensor2f x)
 {
-	x = t4::Linear(x, model.mapping_block_1_weight, model.mapping_block_1_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_2_weight, model.mapping_block_2_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_3_weight, model.mapping_block_3_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_4_weight, model.mapping_block_4_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_5_weight, model.mapping_block_5_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_6_weight, model.mapping_block_6_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_7_weight, model.mapping_block_7_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
-	x = t4::Linear(x, model.mapping_block_8_weight, model.mapping_block_8_bias);
-	x = t4::LeakyReluInplace(x, 0.2);
+	for (int i = 0; i < 8; ++i)
+	{
+		x = t4::Linear(x, model.mapping_block_weight[i], model.mapping_block_bias[i]);
+		x = t4::LeakyReluInplace(x, 0.2);
+	}
 	return x;
 }
 
@@ -143,12 +132,10 @@ t4::tensor4f updcale2d(t4::tensor4f in)
 	return out;
 }
 
-
-t4::tensor3f GenImage(StyleGAN model)
+t4::tensor2f GenW(StyleGAN model)
 {
-	T4_ScopeProfiler(GenerateImage)
-	auto z = t4::tensor2f::RandN({1, 512});
-	//auto z = model.latents;
+	//auto z = t4::tensor2f::RandN({1, 512});
+	auto z = model.latents;
 	float s = 0;
 	const float* __restrict src = z.ptr();
 	for (int64_t i = 0, l = z.size(); i < l; ++i)
@@ -158,345 +145,60 @@ t4::tensor3f GenImage(StyleGAN model)
 	}
 	s /= z.size();
 
-    z = z / sqrt(s + 1e-8f);
+	z = z / sqrt(s + 1e-8f);
 
 	auto w = MappingForward(model, z);
 
-	w = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
+	return w;
+}
 
-	auto x = model.block_0_const;
-
-#define BLOCK(X) model.block_0_##X
-
+std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t4::tensor2f w, int step)
+{
+	if (step == 0)
 	{
-		//T4_ScopeProfiler(BLOCK)
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
+		x = model.block_0_const;
 	}
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_1_##X
+	else
 	{
-		//T4_ScopeProfiler(BLOCK)
-		x = updcale2d(x);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
+		if (step < 5)
+		{
+			x = updcale2d(x);
+			x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, model.block[step].conv_1_weight);
+		}
+		else
+		{
+			x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, model.block[step].conv_1_weight);
+		}
 		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
 	}
 
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_2_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = updcale2d(x);
+	x = x + model.block[step].noise_weight_1 * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
 
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
+	x = x + model.block[step].bias_1;
 
-		x = blur2d(x);
+	x = t4::LeakyReluInplace(x, 0.2);
 
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
+	x = IN(x);
 
-		x = x + BLOCK(bias_1);
+	auto s1 = t4::Linear(w, model.block[step].style_1_weight, model.block[step].style_1_bias);
 
-		x = t4::LeakyReluInplace(x, 0.2);
+	x = style_mod(x, s1);
 
-		x = IN(x);
+	x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, model.block[step].conv_2_weight);
 
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
+	x = x + model.block[step].noise_weight_2 * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
 
-		x = style_mod(x, s1);
+	x = x + model.block[step].bias_2;
 
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
+	x = t4::LeakyReluInplace(x, 0.2);
 
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
+	x = IN(x);
 
-		x = x + BLOCK(bias_2);
+	auto s2 = t4::Linear(w, model.block[step].style_2_weight, model.block[step].style_2_bias);
 
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_3_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = updcale2d(x);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_4_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = updcale2d(x);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_5_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_6_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-
-
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_7_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-
-
-	//////////////////
-#undef 	BLOCK
-#define BLOCK(X) model.block_8_##X
-	{
-		//T4_ScopeProfiler(BLOCK)
-		x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, BLOCK(conv_1_weight));
-
-		x = blur2d(x);
-
-		x = x + BLOCK(noise_weight_1) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_1);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s1 = t4::Linear(w, BLOCK(style_1_weight), BLOCK(style_1_bias));
-
-		x = style_mod(x, s1);
-
-		x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, BLOCK(conv_2_weight));
-
-		x = x + BLOCK(noise_weight_2) * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
-
-		x = x + BLOCK(bias_2);
-
-		x = t4::LeakyReluInplace(x, 0.2);
-
-		x = IN(x);
-
-		auto s2 = t4::Linear(w, BLOCK(style_2_weight), BLOCK(style_2_bias));
-
-		x = style_mod(x, s2);
-	}
-
-	{
-		//T4_ScopeProfiler(ToRGB)
-		x = t4::Conv2d<1, 1, 1, 1, 0, 0, 1, 1>(x, BLOCK(to_rgb_weight), BLOCK(to_rgb_bias));
-	}
-	return x.Sub(0);
+	x = style_mod(x, s2);
+	auto img = t4::Conv2d<1, 1, 1, 1, 0, 0, 1, 1>(x, model.block[step].to_rgb_weight, model.block[step].to_rgb_bias).Sub(0);
+	return std::make_pair(x, img);
 }
 
 
@@ -510,10 +212,28 @@ using namespace emscripten;
 #ifndef __EMSCRIPTEN__
 int main()
 {
-	auto model = StyleGANLoad("StyleGAN.bin");
+	auto model = StyleGANLoad("StyleGAN.ct4");
 
-	auto x = GenImage(model);
-	image_io::imwrite(x * 0.5f + 0.5f, "image.png");
+	//for(int i = 0; i < 100; ++i)
+	{
+		auto w = GenW(model);
+		auto w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
+		t4::tensor4f x;
+		t4::tensor3f img;
+		for (int i = 0; i < 9; ++i)
+		{
+			t4::tensor2f current_w = w;
+			if (i < 4)
+			{
+				current_w = w_truncated;
+			}
+			auto result = GenImage(model, x, current_w, i);
+			x = result.first;
+			img = result.second;
+		}
+		image_io::imwrite(img * 0.5f + 0.5f, "image_12.png");
+	}
+
 	return 0;
 }
 #endif
@@ -523,17 +243,41 @@ class Generator
 public:
 	Generator()
 	{
-		model = StyleGANLoad("StyleGAN.bin");
+		model = StyleGANLoad("StyleGAN.ct4");
+		x = t4::tensor4f();
 	}
 	std::string GenerateImage()
 	{
-		auto x = GenImage(model);
-		std::string image_png = image_io::imwrite_to_base64(x * 0.5f + 0.5f);
+		if (step == 0)
+		{
+			w = GenW(model);
+			w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
+		}
+
+		t4::tensor2f current_w = w;
+		if (step < 4)
+		{
+			current_w = w_truncated;
+		}
+
+		auto result = GenImage(model, x, current_w, step);
+		step++;
+		if (step== 9)
+		{
+			step = 0;
+		}
+
+		x = result.first;
+		std::string image_png = image_io::imwrite_to_base64(result.second * 0.5f + 0.5f);
 		return image_png;
 	}
 
 private:
 	StyleGAN model;
+	t4::tensor4f x;
+	t4::tensor2f w;
+	t4::tensor2f w_truncated;
+	int step = 0;
 };
 
 #ifdef __EMSCRIPTEN__

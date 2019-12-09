@@ -47,14 +47,14 @@ def main():
 		"-s", "ASSERTIONS=" + assertions,
 		"-s", "DEMANGLE_SUPPORT=" + demangle,
         #"-s", "ALLOW_MEMORY_GROWTH=0",
-		"-s", "TOTAL_MEMORY=1024MB",
+		"-s", "TOTAL_MEMORY=1200MB",
         "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=[\"ccall\", \"cwrap\"]",
 		"--llvm-lto", lto,
 		"--closure", closure,
 		"-s", "NO_EXIT_RUNTIME=1",
 		"-s", "DISABLE_EXCEPTION_CATCHING=1",
 		"--bind",
-		"--preload-file", "StyleGAN.bin"]
+		"--preload-file", "StyleGAN.ct4"]
 	)
 
 	timeStart = time.time()
@@ -63,11 +63,14 @@ def main():
 	Includes = [
 		"tensor4/examples/common",
 		"tensor4/include",
+		"zfp/include",
 	]
-	
+
 	files = ["main.cpp", "StyleGAN.cpp"]
-	
-	program = env.Program('stylegan', files, LIBS=[], CPPFLAGS=optimization + ['-std=c++14',  debug], LIBPATH='.', CPPPATH = Includes)
+	zfp = Glob("zfp/src", "*.c")
+
+	zfpl = env.Library('zfplib', zfp, LIBS=[], CPPFLAGS=optimization + [debug], LIBPATH='.', CPPPATH = Includes)
+	program = env.Program('stylegan', files, LIBS=[zfpl], CPPFLAGS=optimization + ['-std=c++14',  debug], LIBPATH='.', CPPPATH = Includes)
 	
 	
 def PrintInformationOnBuildIsFinished(startTimeInSeconds):
@@ -83,6 +86,13 @@ def GlobR(path, filter) :
 	for root, dirnames, filenames in os.walk(path):
   		for filename in fnmatch.filter(filenames, filter):
    			matches.append(os.path.join(root, filename)) 
+	return matches
+
+def Glob(path, filter) :
+	matches = []
+	onlyfiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+	for filename in fnmatch.filter(onlyfiles, filter):
+		matches.append(os.path.join(path, filename))
 	return matches
 
 if __name__ == "SCons.Script":

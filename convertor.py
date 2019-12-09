@@ -27,7 +27,7 @@ import numpy as np
 
 def write_blob(model, filename=None):
     if filename is None:
-        filename = model.class_name + '.bin'
+        filename = model.class_name + '.t4'
 
     with open(filename, "wb") as f:
         for w_name in model.model_dict.keys():
@@ -45,7 +45,10 @@ def write_blob(model, filename=None):
             f.write(struct.pack("b", w.ndim))
             for i in range(w.ndim):
                 f.write(struct.pack("i", w.shape[i]))
-            f.write(w.tobytes())
+            b = w.tobytes()
+            f.write(struct.pack("Q", len(b)))
+            f.write(struct.pack("Q", 0))
+            f.write(b)
 
 
 class Model:
