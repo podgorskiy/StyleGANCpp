@@ -183,6 +183,7 @@ std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t
 	auto s1 = t4::Linear(w, model.block[step].style_1_weight, model.block[step].style_1_bias);
 
 	x = style_mod(x, s1);
+	t4::release(s1);
 
 	x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, model.block[step].conv_2_weight);
 
@@ -197,6 +198,8 @@ std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t
 	auto s2 = t4::Linear(w, model.block[step].style_2_weight, model.block[step].style_2_bias);
 
 	x = style_mod(x, s2);
+	t4::release(s2);
+
 	auto img = t4::Conv2d<1, 1, 1, 1, 0, 0, 1, 1>(x, model.block[step].to_rgb_weight, model.block[step].to_rgb_bias).Sub(0);
 	return std::make_pair(x, img);
 }

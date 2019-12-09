@@ -7,7 +7,7 @@ from SCons.Defaults import *
 release = True
 
 if(release):
-	optimization = ['-O3', '-DNDEBUG']
+	optimization = ['-O3', '-DNDEBUG', '-fno-rtti', '-fno-exceptions', '-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0']
 	debug = '-g0'
 	lto = "1"
 	closure = "0"
@@ -46,8 +46,8 @@ def main():
 		"-lGL",
 		"-s", "ASSERTIONS=" + assertions,
 		"-s", "DEMANGLE_SUPPORT=" + demangle,
-        #"-s", "ALLOW_MEMORY_GROWTH=0",
-		"-s", "TOTAL_MEMORY=1200MB",
+        "-s", "ALLOW_MEMORY_GROWTH=0",
+		"-s", "TOTAL_MEMORY=1023MB",
         "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=[\"ccall\", \"cwrap\"]",
 		"--llvm-lto", lto,
 		"--closure", closure,
