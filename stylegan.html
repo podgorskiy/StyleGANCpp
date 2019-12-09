@@ -153,27 +153,30 @@
 	  var imageOut = document.querySelector('#image-out');
 	  var container = document.querySelector('#container');
 
-	  var renderImage = function()
+	  var renderImage = function(step)
 	  {
 		var img = document.createElement("img");
-		var instance = new Module.Generator();
+        img.setAttribute("width", "1024px");
+        img.setAttribute("height", "1024px");
 		img.src = instance.GenerateImage();
+		while (container.firstChild) {
+		    container.removeChild(container.firstChild);
+		}
 		container.appendChild(img);
+		if (step < 8)
+		    setTimeout(function(){ renderImage(step + 1); }, 1);
 	  };
 
 	  var Generate = function() {};
+	  var instance = function() {};
 
       var Module = {
         preRun: [],
         postRun: function()
 		{
+	        instance = new Module.Generator();
 			Generate = function() {
-				while (container.firstChild) {
-					container.removeChild(container.firstChild);
-				}
-				for (i = 0; i < 1; i++) {
-					setTimeout(renderImage, 0 );
-				}
+			    setTimeout(function(){ renderImage(0); }, 1);
 			}
 			Generate();
 		},
