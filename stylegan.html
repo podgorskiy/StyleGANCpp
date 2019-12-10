@@ -154,17 +154,39 @@
                     Give it some time, it's running in a single thread.
 		</div>
 		<div class="row m-2">
-            <div class="col">
+            <div class="col-3">
+		        <div class="row m-2">
                         <button class="btn btn-dark mt-0 mx-2 w-75" id="gb" onclick="Generate()">
                             Generate!
                         </button>
+		        </div>
+		        <div class="row m-2 d-block ">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="exampleRadios" id="radio1" value="option1" checked>
+                      <label class="form-check-label" for="radio1">
+                        Random
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="exampleRadios" id="radio2" value="option2">
+                      <label class="form-check-label" for="radio2">
+                        From given Z
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="exampleRadios" id="radio3" value="option3">
+                      <label class="form-check-label" for="radio3">
+                        Random from seed: <br/> <input type="number" id="seed" min="0" value="5" />
+                      </label>
+                    </div>
+		        </div>
 		    </div>
             <div class="col-9">
                 <div class="input-group input-group-sm">
                   <div class="input-group-prepend">
                     <span class="input-group-text">Z</span>
                   </div>
-                  <textarea class="form-control form-control-sm" rows="3" placeholder="Paste here base64 encoded Z vector" style="overflow:auto;resize:none"></textarea>
+                  <textarea class="form-control form-control-sm" rows="5" id="ta" placeholder="Paste here base64 encoded Z vector" style="overflow:auto;resize:none"></textarea>
                 </div>
 		    </div>
 		</div>
@@ -188,6 +210,11 @@
 	  var container = document.querySelector('#container');
 	  var progress = document.querySelector('#pb');
 	  var generate_button = document.querySelector('#gb');
+	  var text_area = document.querySelector('#ta');
+	  var radio1 = document.querySelector('#radio1');
+	  var radio2 = document.querySelector('#radio2');
+	  var radio3 = document.querySelector('#radio3');
+	  var seed = document.querySelector('#seed');
 	  var working = false;
 
 	  var renderImage = function(step)
@@ -197,6 +224,18 @@
 		    generate_button.classList.add("disabled");
 		    progress.classList.add("progress-bar-animated");
 		    generate_button.innerHTML = "<span class=\"spinner-border spinner-border-sm\" role=\"status\" aria-hidden=\"true\"></span> Working...";
+		    if (radio1.checked)
+		        str = instance.RandomZ();
+		    if (radio2.checked)
+		    {
+		        instance.SetZfromString(text_area.value);
+		        str = text_area.value
+		    }
+		    if (radio3.checked)
+		    {
+		        str = instance.RandomZfromASeed(parseInt(seed.value));
+		    }
+		    text_area.value = str;
         }
         progress.setAttribute("aria-valuenow", Math.round(step * 100 / 8).toString());
         progress.setAttribute("style", "width: " + Math.round(step * 100 / 8).toString() + "%");
