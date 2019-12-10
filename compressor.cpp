@@ -110,23 +110,23 @@ namespace t4
 		return cd;
 	}
 }
-//
-//int main()
-//{
-//	t4::model_dict dict = t4::load("StyleGAN.t4");
-//
-//	int compression = 12;
-//
-//	dict = t4::compress(dict, compression);
-//
-//	t4::save(dict, "../StyleGAN.ct4");
-//
-//	t4::model_dict cdict = t4::load("../StyleGAN.ct4");
-//
-//	dict = t4::decompress(dict, compression);
-//
-//	t4::save(dict, "../StyleGAN.dct4");
-//
-//
-//	return 0;
-//}
+
+int main()
+{
+	t4::model_dict dict = t4::load("StyleGAN.t4");
+
+	int compression = 12;
+
+	dict = t4::compress(dict, compression);
+
+	t4::save(dict, "../StyleGAN.ct4");
+
+	t4::model_dict cdict = t4::load("../StyleGAN.ct4");
+
+	dict = t4::decompress(dict, compression);
+
+	t4::save(dict, "../StyleGAN.dct4");
+
+
+	return 0;
+}

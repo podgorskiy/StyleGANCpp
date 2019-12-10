@@ -88,6 +88,10 @@ def load_from(name):
     latents = rnd.randn(1, 512)
     model.model_dict["latents"] = latents.astype(np.float32)
 
+    # custom trained rgb layers
+    with open('rgbs.pkl', 'rb') as handle:
+        rgbs = pickle.load(handle)
+
     for i in range(9):
         j = 9 - i - 1
         name = '%dx%d' % (2 ** (2 + i), 2 ** (2 + i))
@@ -143,6 +147,10 @@ def load_from(name):
         std = gain / np.sqrt(np.prod(w.shape[1]))
         model.model_dict["block_%d_to_rgb_weight" % i] = w * std
         model.model_dict["block_%d_to_rgb_bias" % i] = tensor('G_synthesis/ToRGB_lod%d/bias' % (j))
+
+        # ovveride to rgb layers with custom trained ones.
+        model.model_dict["block_%d_to_rgb_weight" % i] = rgbs[i][0]
+        model.model_dict["block_%d_to_rgb_bias" % i] = rgbs[i][1]
 
     return model #, Gs_
 

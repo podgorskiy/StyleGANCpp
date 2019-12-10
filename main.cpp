@@ -134,8 +134,8 @@ t4::tensor4f updcale2d(t4::tensor4f in)
 
 t4::tensor2f GenW(StyleGAN model)
 {
-	//auto z = t4::tensor2f::RandN({1, 512});
-	auto z = model.latents;
+	auto z = t4::tensor2f::RandN({1, 512});
+	//auto z = model.latents;
 	float s = 0;
 	const float* __restrict src = z.ptr();
 	for (int64_t i = 0, l = z.size(); i < l; ++i)
