@@ -188,6 +188,10 @@
                   </div>
                   <textarea class="form-control form-control-sm" rows="5" id="ta" placeholder="Paste here base64 encoded Z vector" style="overflow:auto;resize:none"></textarea>
                 </div>
+
+                  <a type="text" id="link" class="" href="stylegan.html#">
+                      Link to this generation
+                  </a>
 		    </div>
 		</div>
 		<div class="row m-2">
@@ -215,8 +219,11 @@
 	  var radio2 = document.querySelector('#radio2');
 	  var radio3 = document.querySelector('#radio3');
 	  var seed = document.querySelector('#seed');
+	  var link = document.querySelector('#link');
 	  var working = false;
-
+      function getAnchor() {
+         return (document.URL.split('#').length > 1) ? document.URL.split('#')[1] : null;
+      }
 	  var renderImage = function(step)
 	  {
         if (step == 0)
@@ -236,6 +243,7 @@
 		        str = instance.RandomZfromASeed(parseInt(seed.value));
 		    }
 		    text_area.value = str;
+		    link.href="stylegan.html#" + str
         }
         progress.setAttribute("aria-valuenow", Math.round(step * 100 / 8).toString());
         progress.setAttribute("style", "width: " + Math.round(step * 100 / 8).toString() + "%");
@@ -274,7 +282,13 @@
 			    working = true;
 			    setTimeout(function(){ renderImage(0); }, 1);
 			}
-			//Generate();
+			anchor = getAnchor()
+			if (anchor)
+			{
+			    radio2.checked = true;
+			    text_area.value = anchor;
+                Generate();
+			}
 		},
         print: (function() {
           var element = document.getElementById('output');
