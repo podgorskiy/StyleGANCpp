@@ -43,7 +43,7 @@ file(GLOB SOURCES_ZFP zfp/src/*.c)
 
 # Main sources
 ##############################################################
-file(GLOB SOURCES main.cpp StyleGAN.cpp StyleGAN.h)
+file(GLOB SOURCES main.cpp StyleGAN.cpp StyleGAN.h numpy-like-randn.h)
 add_executable(stylegan ${SOURCES} ${SOURCES_ZFP})
 
 # Compressor sources

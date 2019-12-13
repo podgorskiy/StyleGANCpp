@@ -3,6 +3,8 @@
 #include "tensor4.h"
 #include "StyleGAN.h"
 #include "image_io.h"
+#include "numpy-like-randn.h"
+#include "zfp.h"
 
 
 t4::tensor2f MappingForward(const StyleGAN& model, t4::tensor2f x)
@@ -132,10 +134,20 @@ t4::tensor4f updcale2d(t4::tensor4f in)
 	return out;
 }
 
-t4::tensor2f GenW(StyleGAN model)
+t4::tensor2f GenZ(numpy_like::RandomState& rng)
 {
-	auto z = t4::tensor2f::RandN({1, 512});
-	//auto z = model.latents;
+	auto z = t4::tensor2f::New({1, 512});
+	auto* ptr = z.ptr();
+	for (int64_t i = 0, l = z.size(); i < l; ++i)
+	{
+		ptr[i] = rng.randn();
+	}
+	return z;
+}
+
+
+t4::tensor2f GenW(StyleGAN model, t4::tensor2f z)
+{
 	float s = 0;
 	const float* __restrict src = z.ptr();
 	for (int64_t i = 0, l = z.size(); i < l; ++i)
@@ -151,6 +163,7 @@ t4::tensor2f GenW(StyleGAN model)
 
 	return w;
 }
+
 
 std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t4::tensor2f w, int step)
 {
@@ -217,9 +230,10 @@ int main()
 {
 	auto model = StyleGANLoad("StyleGAN.ct4");
 
-	//for(int i = 0; i < 100; ++i)
 	{
-		auto w = GenW(model);
+		auto rs = numpy_like::RandomState(5);
+		auto z = GenZ(rs);
+		auto w = GenW(model, z);
 		auto w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
 		t4::tensor4f x;
 		t4::tensor3f img;
@@ -244,16 +258,36 @@ int main()
 class Generator
 {
 public:
-	Generator()
+	Generator():rng(std::random_device()())
 	{
 		model = StyleGANLoad("StyleGAN.ct4");
 		x = t4::tensor4f();
 	}
+
+	std::string RandomZ()
+	{
+		z = GenZ(rng);
+		return image_io::base64_encode((uint8_t*)z.ptr(), 512 * sizeof(float));
+	}
+
+	std::string RandomZfromASeed(uint32_t seed)
+	{
+		rng = numpy_like::RandomState(seed);
+		return RandomZ();
+	}
+
+	void SetZfromString(const std::string& s)
+	{
+		z = t4::tensor2f::New({1, 512});
+		size_t _;
+		image_io::base64_decode(s.c_str(), (uint8_t*)z.ptr(), s.size(), _);
+	}
+
 	std::string GenerateImage()
 	{
 		if (step == 0)
 		{
-			w = GenW(model);
+			w = GenW(model, z);
 			w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
 		}
 
@@ -276,8 +310,10 @@ public:
 	}
 
 private:
+	numpy_like::RandomState rng;
 	StyleGAN model;
 	t4::tensor4f x;
+	t4::tensor2f z;
 	t4::tensor2f w;
 	t4::tensor2f w_truncated;
 	int step = 0;
@@ -289,6 +325,9 @@ EMSCRIPTEN_BINDINGS(StyleGan) {
   class_<Generator>("Generator")
     .constructor<>()
     .function("GenerateImage", &Generator::GenerateImage)
+    .function("RandomZ", &Generator::RandomZ)
+    .function("RandomZfromASeed", &Generator::RandomZfromASeed)
+    .function("SetZfromString", &Generator::SetZfromString)
     ;
 }
 #endif
