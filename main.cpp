@@ -18,20 +18,22 @@ using namespace emscripten;
 #ifndef __EMSCRIPTEN__
 int main()
 {
+	int layers = 9;
+
 	// if loading compressed
-	auto model = StyleGANLoad("StyleGAN.ct4", 9);
+	auto model = StyleGANLoad("StyleGAN.ct4", layers);
 
 	// if loading original
-	// auto model = StyleGANLoad("StyleGAN_cat.t4", 7, false);
+	// auto model = StyleGANLoad("StyleGAN_cat.t4", layers, false);
 
 	{
 		auto rs = numpy_like::RandomState(5);
 		auto z = GenZ(rs);
 		auto w = GenW(model, z);
-		auto w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.5f + t4::Unsqueeze<0>(model.dlatent_avg);
+		auto w_truncated = (w - t4::Unsqueeze<0>(model.dlatent_avg)) * 0.7f + t4::Unsqueeze<0>(model.dlatent_avg);
 		t4::tensor4f x;
 		t4::tensor3f img;
-		for (int i = 0; i < 7; ++i)
+		for (int i = 0; i < layers; ++i)
 		{
 			t4::tensor2f current_w = w;
 			if (i < 4)
