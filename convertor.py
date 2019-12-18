@@ -57,7 +57,7 @@ class Model:
         self.model_dict = {}
 
 
-def load_from(name):
+def load_from(name, layers=9):
     dnnlib.tflib.init_tf()
     with open(name, 'rb') as f:
         m = pickle.load(f)
@@ -92,8 +92,8 @@ def load_from(name):
     with open('rgbs.pkl', 'rb') as handle:
         rgbs = pickle.load(handle)
 
-    for i in range(9):
-        j = 9 - i - 1
+    for i in range(layers):
+        j = layers - i - 1
         name = '%dx%d' % (2 ** (2 + i), 2 ** (2 + i))
 
         prefix = 'G_synthesis/%s' % name

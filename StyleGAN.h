@@ -1,4 +1,6 @@
+#pragma once
 #include "tensor4.h"
+#include "numpy-like-randn.h"
 
 
 struct Block
@@ -28,5 +30,11 @@ struct StyleGAN
 };
 
 
-StyleGAN StyleGANLoad(const char* filename);
+t4::tensor2f GenZ(numpy_like::RandomState& rng);
+
+t4::tensor2f GenW(StyleGAN model, t4::tensor2f z);
+
+std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t4::tensor2f w, int step);
+
+StyleGAN StyleGANLoad(const char* filename, int layers, bool decompress = true);
 

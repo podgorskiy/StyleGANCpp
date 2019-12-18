@@ -1,63 +1,227 @@
 #include "StyleGAN.h"
-#include "zfp.h"
+#include "decompress.h"
 
-namespace t4
+
+t4::tensor2f MappingForward(const StyleGAN& model, t4::tensor2f x)
 {
-	inline t4::model_dict decompress(const t4::model_dict md, int compression)
+	for (int i = 0; i < 8; ++i)
 	{
-		t4::model_dict cd;
-
-		for (auto it = md.m_parameters.cbegin(); it != md.m_parameters.cend(); ++it)
-		{
-			auto entry = *it;
-			model_dict::Entry e;
-			printf("%s\n", entry.first.c_str());
-			e = entry.second;
-			zfp_type type = zfp_type_float;
-			zfp_field* field = nullptr;
-			std::vector<uint64_t> sshape;
-			assert(e.compressed_size != 0);
-
-			auto compressed_data = e.ptr;
-			e.ptr.reset(new uchar[e.size]);
-
-			int nel = 1;
-			for (int i = 0; i < e.ndim; ++i)
-			{
-				nel *= e.shape[i];
-			}
-
-			if (e.ndim == 4 && e.shape[3] > 1 && e.shape[2] > 1)
-			{
-				field = zfp_field_2d(e.ptr.get(), type, e.shape[3], nel / e.shape[3]);
-			}
-			else
-			{
-				field = zfp_field_1d(e.ptr.get(), type, nel);
-			}
-
-			zfp_stream* zfp = zfp_stream_open(nullptr);
-			zfp_stream_set_precision(zfp, compression);
-			size_t bufsize = zfp_stream_maximum_size(zfp, field);
-
-			bitstream* stream = stream_open(compressed_data.get(), bufsize);
-			zfp_stream_set_bit_stream(zfp, stream);
-
-			int64_t size = zfp_decompress(zfp, field);
-			assert(size != 0);
-			e.compressed_size = 0;
-
-			cd.m_parameters[entry.first] = e;
-		}
-		return cd;
+		x = t4::Linear(x, model.mapping_block_weight[i], model.mapping_block_bias[i]);
+		x = t4::LeakyReluInplace(x, 0.2);
 	}
+	return x;
 }
 
-StyleGAN StyleGANLoad(const char* filename)
+
+t4::tensor4f IN(t4::tensor4f x)
+{
+	t4::tensor4f e = t4::GlobalAveragePool2d(x);
+	x = x - e;
+	t4::tensor4f var= t4::GlobalAveragePool2d(x * x);
+	var = t4::Pow(var + 1e-8f, 0.5f);
+	return x / var;
+}
+
+
+t4::tensor4f style_mod(t4::tensor4f x, t4::tensor2f style)
+{
+	t4::tensor1i shape = t4::Shape(style);
+	t4::tensor1i count = t4::Unsqueeze<0>(t4::Gather(shape, t4::Constant<t4::int64>(0)));
+	t4::tensor1i component = t4::Unsqueeze<0>(t4::Gather(shape, t4::Constant<t4::int64>(1)));
+	component = component / int64_t(2);
+	t4::tensor1i chunks = t4::Unsqueeze<0>(t4::Constant<t4::int64>(2));
+	t4::tensor1i _shape = t4::Concat<0>(t4::Concat<0>(count, chunks), component);
+	auto _style = t4::Unsqueeze<3>(t4::Unsqueeze<3>(t4::Reshape<3>(style, _shape)));
+	t4::tensor4f style_1 = t4::tensor4f::New({_style.shape()[0], _style.shape()[2], 1, 1});
+	t4::tensor4f style_2 = t4::tensor4f::New({_style.shape()[0], _style.shape()[2], 1, 1});
+	for (int i = 0; i < _style.shape()[0]; ++i)
+	{
+		style_1.Sub(i).Assign(_style.Sub(i, 0));
+		style_2.Sub(i).Assign(_style.Sub(i, 1));
+	}
+	return style_2 + x * (style_1 + 1.0f);
+}
+
+t4::tensor4f blur2d(t4::tensor4f in)
+{
+	//T4_ScopeProfiler(blur2d)
+	const int N = number(in);
+	const int C = channels(in);
+	const int H = height(in);
+	const int W = width(in);
+
+	in = t4::Pad<t4::constant>(in, 0, 0, 1, 1, 0, 0, 1, 1);
+	const int _W = W + 2;
+
+	t4::tensor4f out = t4::tensor4f::New({ N, C, H, W });
+
+	for (int n = 0; n < N; ++n)
+	{
+		parallel_for(int c = 0; c < C; ++c)
+		{
+			auto inSubtensor = in.Sub(n, c);
+			const float* __restrict src = inSubtensor.ptr();
+			auto outSubtensor = out.Sub(n, c);
+			float* __restrict dst = outSubtensor.ptr();
+
+			for (int i = 0; i < H; i++)
+			{
+				for (int j = 0; j < W; j++)
+				{
+					float v = 0;
+					i += 1;
+					j += 1;
+					v += src[(i + 0) * _W + j + 0] * 4;
+					v += src[(i + 0) * _W + j - 1] * 2;
+					v += src[(i + 0) * _W + j + 1] * 2;
+					v += src[(i - 1) * _W + j + 0] * 2;
+					v += src[(i + 1) * _W + j + 0] * 2;
+					v += src[(i - 1) * _W + j - 1];
+					v += src[(i + 1) * _W + j - 1];
+					v += src[(i - 1) * _W + j + 1];
+					v += src[(i + 1) * _W + j + 1];
+					i -= 1;
+					j -= 1;
+					v /= (4 + 2 * 4 + 4);
+					dst[i * W + j] = v;
+				}
+			}
+		}
+	}
+	return out;
+}
+
+
+t4::tensor4f updcale2d(t4::tensor4f in)
+{
+	//T4_ScopeProfiler(updcale2d)
+	const int N = number(in);
+	const int C = channels(in);
+	const int Hin = height(in);
+	const int Win = width(in);
+
+	const int Hout = 2 * Hin;
+	const int Wout = 2 * Win;
+
+	t4::tensor4f out = t4::tensor4f::New({ N, C, Hout, Wout });
+
+	for (int n = 0; n < N; ++n)
+	{
+		parallel_for(int c = 0; c < C; ++c)
+		{
+			auto inSubtensor = in.Sub(n, c);
+			const float* __restrict src = inSubtensor.ptr();
+			auto outSubtensor = out.Sub(n, c);
+			float* __restrict dst = outSubtensor.ptr();
+
+			for (int i = 0; i < Hin; i++)
+			{
+				for (int j = 0; j < Win; j++)
+				{
+					dst[(2 * i + 0) * Wout + 2 * j + 0] = src[i * Win + j];
+					dst[(2 * i + 0) * Wout + 2 * j + 1] = src[i * Win + j];
+					dst[(2 * i + 1) * Wout + 2 * j + 0] = src[i * Win + j];
+					dst[(2 * i + 1) * Wout + 2 * j + 1] = src[i * Win + j];
+				}
+			}
+		}
+	}
+	return out;
+}
+
+t4::tensor2f GenZ(numpy_like::RandomState& rng)
+{
+	auto z = t4::tensor2f::New({1, 512});
+	auto* ptr = z.ptr();
+	for (int64_t i = 0, l = z.size(); i < l; ++i)
+	{
+		ptr[i] = rng.randn();
+	}
+	return z;
+}
+
+
+t4::tensor2f GenW(StyleGAN model, t4::tensor2f z)
+{
+	float s = 0;
+	const float* __restrict src = z.ptr();
+	for (int64_t i = 0, l = z.size(); i < l; ++i)
+	{
+		float x = src[i] * src[i];
+		s += x;
+	}
+	s /= z.size();
+
+	z = z / sqrt(s + 1e-8f);
+
+	auto w = MappingForward(model, z);
+
+	return w;
+}
+
+
+std::pair<t4::tensor4f, t4::tensor3f> GenImage(StyleGAN model, t4::tensor4f x, t4::tensor2f w, int step)
+{
+	if (step == 0)
+	{
+		x = model.block_0_const;
+	}
+	else
+	{
+		if (step < 5)
+		{
+			x = updcale2d(x);
+			x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, model.block[step].conv_1_weight);
+		}
+		else
+		{
+			x = t4::ConvTranspose2d<4, 4, 2, 2, 1, 1, 1, 1>(x, model.block[step].conv_1_weight);
+		}
+		x = blur2d(x);
+	}
+
+	x = x + model.block[step].noise_weight_1 * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
+
+	x = x + model.block[step].bias_1;
+
+	x = t4::LeakyReluInplace(x, 0.2);
+
+	x = IN(x);
+
+	auto s1 = t4::Linear(w, model.block[step].style_1_weight, model.block[step].style_1_bias);
+
+	x = style_mod(x, s1);
+	t4::release(s1);
+
+	x = t4::Conv2d<3, 3, 1, 1, 1, 1, 1, 1>(x, model.block[step].conv_2_weight);
+
+	x = x + model.block[step].noise_weight_2 * t4::tensor4f::RandN({x.shape()[0], 1, x.shape()[2], x.shape()[3]});
+
+	x = x + model.block[step].bias_2;
+
+	x = t4::LeakyReluInplace(x, 0.2);
+
+	x = IN(x);
+
+	auto s2 = t4::Linear(w, model.block[step].style_2_weight, model.block[step].style_2_bias);
+
+	x = style_mod(x, s2);
+	t4::release(s2);
+
+	auto img = t4::Conv2d<1, 1, 1, 1, 0, 0, 1, 1>(x, model.block[step].to_rgb_weight, model.block[step].to_rgb_bias).Sub(0);
+	return std::make_pair(x, img);
+}
+
+
+StyleGAN StyleGANLoad(const char* filename, int layers, bool _decompress)
 {
 	StyleGAN ctx;
-	t4::model_dict dict = decompress(t4::load(filename), 12);
-	//t4::model_dict dict = t4::load(filename);
+	t4::model_dict dict = t4::load(filename);
+	if (_decompress)
+	{
+		dict = decompress(dict, 12);
+	}
+
 	char wname[1024];
 	for (int i = 0; i < 8; ++i)
 	{
@@ -72,7 +236,7 @@ StyleGAN StyleGANLoad(const char* filename)
 
 	int fmap = 8192 / 2;
 	int fmap_max = 512;
-	for (int i = 0; i < 9; ++i)
+	for (int i = 0; i < layers; ++i)
 	{
 		int nf = std::min(fmap, fmap_max);
 		fmap /= 2;
@@ -115,5 +279,3 @@ StyleGAN StyleGANLoad(const char* filename)
 
 	return ctx;
 }
-
-
