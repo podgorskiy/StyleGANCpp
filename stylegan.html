@@ -148,11 +148,13 @@
 
     <div class="container d-block mb-5 code py-4 px-2">
 		<div class="row">
-				    <h2 class="mx-auto">StyleGAN in WebAssembly using tensor4</h2>
-		</div>
-		<div class="row m-2">
-                    Give it some time, it's running in a single thread.
-		</div>
+            <h2 class="mx-auto"><a href="https://github.com/NVlabs/stylegan">StyleGAN</a> in WebAssembly using <a href="https://github.com/podgorskiy/tensor4">tensor4.</a> &nbsp&nbsp<a href="https://github.com/podgorskiy/StyleGANCpp"><i class="fab fa-github"></i>Link to code </a> </h2>
+        </div>
+		<div class="row my-0 py-0 mx-2">
+               Give it some time, it's running in a single thread.  &nbsp&nbsp
+		       <a href="https://twitter.com/share?ref_src=twsrc%5Etfw" class="twitter-share-button mx-2" data-text="In-browser StyleGAN using WebAssembly" data-hashtags="stylegan-cpp" data-related="StasPodgorskiy" data-show-count="false">Tweet</a>
+		         &nbsp&nbsp<a href="https://twitter.com/StasPodgorskiy?ref_src=twsrc%5Etfw" class="twitter-follow-button mx-2" data-text="In browser StyleGAN using WebAssembly" data-hashtags="stylegan-cpp" data-related="StasPodgorskiy" data-show-count="false">Follow @StasPodgorskiy</a>
+        </div>
 		<div class="row m-2">
             <div class="col-3">
 		        <div class="row m-2">
@@ -164,19 +166,19 @@
                     <div class="form-check">
                       <input class="form-check-input" type="radio" name="exampleRadios" id="radio1" value="option1" checked>
                       <label class="form-check-label" for="radio1">
-                        Random
+                        &nbspRandom
                       </label>
                     </div>
                     <div class="form-check">
                       <input class="form-check-input" type="radio" name="exampleRadios" id="radio2" value="option2">
                       <label class="form-check-label" for="radio2">
-                        From given Z
+                        &nbspFrom given Z
                       </label>
                     </div>
                     <div class="form-check">
                       <input class="form-check-input" type="radio" name="exampleRadios" id="radio3" value="option3">
                       <label class="form-check-label" for="radio3">
-                        Random from seed: <br/> <input type="number" id="seed" min="0" value="5" />
+                        &nbspFrom seed: <br/> <input type="number" id="seed" min="0" value="5" />
                       </label>
                     </div>
 		        </div>
@@ -188,11 +190,11 @@
                   </div>
                   <textarea class="form-control form-control-sm" rows="5" id="ta" placeholder="Paste here base64 encoded Z vector" style="overflow:auto;resize:none"></textarea>
                 </div>
-
+                You can copy-paste this Z string to save generation and restore it later.
                   <a type="text" id="link" class="" href="stylegan.html#">
-                      Link to this generation
+                      Shareable link to this generation
                   </a>
-		    </div>
+          </div>
 		</div>
 		<div class="row m-2">
                     <div class="progress w-100" >
@@ -204,6 +206,9 @@
 		                </div>
 
 		</div>
+    </div>
+    <div class="navbar justify-content-center text-secondary unselectable">
+        Unofficial implementation of generator of StyleGAN. <a class="ml-2" href="https://github.com/NVlabs/stylegan"> Original code and paper </a> &nbspby Karras et al. and Nvidia. C++ implementation and WebAsm build created by &nbsp<a href="http://podgorskiy.com/"> Stanislav Pidhorskyi </a>. <a class="ml-2" href="https://github.com/podgorskiy/StyleGANCpp">Link to C++ + tensor4 implementation</a>. Web version made with <a class="ml-2" href="https://kripken.github.io/emscripten-site/index.html">emscripten</a>. Weights of StyleGAN are <a class="ml-2" href="https://drive.google.com/drive/folders/1MASQyN5m0voPcx7-9K0r5gObhvvPups7">official, from GoogleDrive</a>.
     </div>
 
     <script type='text/javascript'>
@@ -370,6 +375,16 @@
 	}, 0 );
     </script>
     <script async type="text/javascript" src="stylegan.js"></script>
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-54781662-1', 'auto');
+      ga('send', 'pageview');
+    </script>
   </body>
 </html>
 
